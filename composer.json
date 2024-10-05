@@ -1,0 +1,11 @@
+{
+  "require": {
+    "bref/bref": "^2.3.5",
+    "aws/aws-sdk-php": "^3.321",
+    "firebase/php-jwt": "^6.10",
+    "hidehalo/nanoid-php": "^1.1",
+    "symfony/dotenv": "^6.4",
+    "bref/extra-php-extensions": "^1.4",
+    "predis/predis": "^2.2"
+  }
+}

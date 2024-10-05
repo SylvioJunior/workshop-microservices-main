@@ -1,0 +1,46 @@
+service: identityprovider
+frameworkVersion: "3"
+
+plugins:
+  - ./vendor/bref/bref
+  - ./vendor/bref/extra-php-extensions
+
+package:
+  patterns:
+    - "!node_modules/**"
+
+provider:
+  name: aws
+  stage: prod
+  profile: ip
+  region: sa-east-1
+  deploymentMethod: direct
+  memorySize: 1024
+  logRetentionInDays: 3
+  architecture: x86_64
+  deploymentPrefix: ip
+  deploymentBucket:
+    name: identityprovider-deploy
+    maxPreviousDeploymentArtifacts: 5
+    blockPublicAccess: true
+    skipPolicySetup: true
+  httpApi:
+    cors: true
+  environment:
+    env_secrets_key: "eK8ONG0mmau2F3Lm7XTPS3bjBS71qasd";
+    env_system_salt: "Ux9K2pL7mF4qR3sT8vY6wZ0bN1cE3df"
+    env_ip_dynamo: "return new \\Aws\\DynamoDb\\DynamoDbClient(['credentials' => ['key' => '','secret' => ''],'region' => 'sa-east-1','version' => 'latest']);"
+    env_ip_redis: "return (function () { \$redis = new \\Redis(); \$redis->connect('hostdomain.tld', 18124, 0, '', 0, 0, ['auth' => ['%user%', '%password%']]); return \$redis;})();"
+    env_ip_predis: "return (function () { \$redis = new \\Predis\\Client(['scheme' => 'tcp','host' => 'hostdomain.tld', 'port' => 18124, 'username' => '%user%', 'password' => '%password%']); return \$redis;})();"
+    env_ip_db: "return new \\PDO('pgsql:host=hostname.tld;dbname=%dbname%','%user%','%password%');"
+
+functions:
+  api:
+    name: identityprovider-api
+    handler: handlers/apigateway.php
+    runtime: php-81
+    timeout: 29
+    events:
+      - httpApi: "*"
+    layers:
+      - ${bref-extra:redis-php-81}

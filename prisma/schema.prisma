@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("DATABASE_SHADOW_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum CredentialType {
+  PASSWORD
+  OAUTH_TOKEN
+  CERTIFICATE
+}
+
+enum ProviderName {
+  GOOGLE
+  FACEBOOK
+  TWITTER
+  GITHUB
+}
+
+model User {
+  id                BigInt    @id @default(autoincrement()) @db.BigInt
+  externalId        String    @unique @default(nanoid())
+  username          String    @unique
+  email             String    @unique
+  phoneNumber       String?
+  passwordHash      String
+  passwordSalt      String
+  accountStatus     AccountStatus @default(PENDING)
+  emailVerified     Boolean   @default(false)
+  phoneVerified     Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  mfaEnabled        Boolean   @default(false)
+  customAttributes  Json?
+  sessions          Session[]
+  groups            UserGroup[]
+  roles             UserRole[]
+  externalProviders ExternalIdentityProvider[]
+  auditLogs         AuditLog[]
+  credentials       Credential[]
+  userPolicies      UserPolicy[]
+}
+
+model Credential {
+  id         BigInt   @id @default(autoincrement()) @db.BigInt
+  externalId String   @unique @default(nanoid())
+  userId     BigInt
+  type       CredentialType
+  value      String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Session {
+  id           BigInt   @id @default(autoincrement()) @db.BigInt
+  externalId   String   @unique @default(nanoid())
+  userId       BigInt
+  accessToken  String
+  refreshToken String
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revokedAt    DateTime?
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Group {
+  id            BigInt      @id @default(autoincrement()) @db.BigInt
+  externalId    String      @unique @default(nanoid())
+  name          String      @unique
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  users         UserGroup[]
+  roles         GroupRole[]
+  groupPolicies GroupPolicy[]
+}
+
+model Role {
+  id          BigInt          @id @default(autoincrement()) @db.BigInt
+  externalId  String          @unique @default(nanoid())
+  name        String          @unique
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  users       UserRole[]
+  groups      GroupRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          BigInt            @id @default(autoincrement()) @db.BigInt
+  externalId  String            @unique @default(nanoid())
+  name        String            @unique
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  roles       RolePermission[]
+  applications ApplicationPermission[]
+}
+
+model Application {
+  id           BigInt   @id @default(autoincrement()) @db.BigInt
+  externalId   String   @unique @default(nanoid())
+  name         String   @unique
+  description  String?
+  clientId     String   @unique
+  clientSecret String
+  redirectURIs String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  permissions  ApplicationPermission[]
+}
+
+model ExternalIdentityProvider {
+  id             BigInt   @id @default(autoincrement()) @db.BigInt
+  externalId     String   @unique @default(nanoid())
+  userId         BigInt
+  providerName   ProviderName
+  providerUserId String
+  linkedAt       DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@unique([providerName, providerUserId])
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  PASSWORD_CHANGE
+  PROFILE_UPDATE
+  ROLE_ASSIGNMENT
+  PERMISSION_CHANGE
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement()) @db.BigInt
+  externalId String   @unique @default(nanoid())
+  userId     BigInt?
+  action     AuditAction
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+  details    Json?
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model UserGroup {
+  userId   BigInt
+  groupId  BigInt
+  joinedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id])
+  group    Group    @relation(fields: [groupId], references: [id])
+
+  @@id([userId, groupId])
+}
+
+model GroupRole {
+  groupId    BigInt
+  roleId     BigInt
+  assignedAt DateTime @default(now())
+  group      Group    @relation(fields: [groupId], references: [id])
+  role       Role     @relation(fields: [roleId], references: [id])
+
+  @@id([groupId, roleId])
+}
+
+model UserRole {
+  userId     BigInt
+  roleId     BigInt
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  role       Role     @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       BigInt
+  permissionId BigInt
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model ApplicationPermission {
+  applicationId BigInt
+  permissionId  BigInt
+  application   Application @relation(fields: [applicationId], references: [id])
+  permission    Permission  @relation(fields: [permissionId], references: [id])
+
+  @@id([applicationId, permissionId])
+}
+
+model Policy {
+  id          BigInt       @id @default(autoincrement()) @db.BigInt
+  externalId  String       @unique @default(nanoid())
+  name        String       @unique
+  description String?
+  rules       Json
+  users       UserPolicy[]
+  groups      GroupPolicy[]
+}
+
+model UserPolicy {
+  userId   BigInt
+  policyId BigInt
+  user     User   @relation(fields: [userId], references: [id])
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  @@id([userId, policyId])
+}
+
+model GroupPolicy {
+  groupId  BigInt
+  policyId BigInt
+  group    Group  @relation(fields: [groupId], references: [id])
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  @@id([groupId, policyId])
+}
